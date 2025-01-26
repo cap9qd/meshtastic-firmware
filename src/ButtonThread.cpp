@@ -1,5 +1,5 @@
 #include "ButtonThread.h"
-#include "../userPrefs.h"
+
 #include "configuration.h"
 #if !MESHTASTIC_EXCLUDE_GPS
 #include "GPS.h"
@@ -189,6 +189,20 @@ int32_t ButtonThread::runOnce()
             // 4 clicks: toggle backlight
             case 4:
                 digitalWrite(PIN_EINK_EN, digitalRead(PIN_EINK_EN) == LOW);
+                break;
+#endif
+#if defined(RAK_4631)
+            // 5 clicks: start accelerometer/magenetometer calibration for 30 seconds
+            case 5:
+                if (accelerometerThread) {
+                    accelerometerThread->calibrate(30);
+                }
+                break;
+            // 6 clicks: start accelerometer/magenetometer calibration for 60 seconds
+            case 6:
+                if (accelerometerThread) {
+                    accelerometerThread->calibrate(60);
+                }
                 break;
 #endif
             // No valid multipress action

@@ -62,21 +62,17 @@ static void onNetworkConnected()
         LOG_INFO("Start WiFi network services");
 
         // start mdns
-        if (
-#ifdef ARCH_RP2040
-            !moduleConfig.mqtt.enabled && // MDNS is not supported when MQTT is enabled on ARCH_RP2040
-#endif
-            !MDNS.begin("Meshtastic")) {
+        if (!MDNS.begin("Meshtastic")) {
             LOG_ERROR("Error setting up MDNS responder!");
         } else {
             LOG_INFO("mDNS Host: Meshtastic.local");
+            MDNS.addService("meshtastic", "tcp", SERVER_API_DEFAULT_PORT);
 #ifdef ARCH_ESP32
             MDNS.addService("http", "tcp", 80);
             MDNS.addService("https", "tcp", 443);
+            // ESP32 prints obtained IP address in WiFiEvent
 #elif defined(ARCH_RP2040)
-            // ARCH_RP2040 does not support HTTPS, create a "meshtastic" service
-            MDNS.addService("meshtastic", "tcp", 4403);
-            // ESP32 handles this in WiFiEvent
+            // ARCH_RP2040 does not support HTTPS
             LOG_INFO("Obtained IP address: %s", WiFi.localIP().toString().c_str());
 #endif
         }
@@ -110,7 +106,9 @@ static void onNetworkConnected()
 #if defined(ARCH_ESP32) && !MESHTASTIC_EXCLUDE_WEBSERVER
         initWebServer();
 #endif
+#if !MESHTASTIC_EXCLUDE_SOCKETAPI
         initApiServer();
+#endif
         APStartupComplete = true;
     }
 
@@ -145,6 +143,11 @@ static int32_t reconnectWiFi()
         delay(5000);
 
         if (!WiFi.isConnected()) {
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+            WiFi.mode(WIFI_MODE_NULL);
+            WiFi.useStaticBuffers(true);
+            WiFi.mode(WIFI_STA);
+#endif
             WiFi.begin(wifiName, wifiPsw);
         }
         isReconnecting = false;
@@ -222,7 +225,7 @@ bool initWifi()
 #if !MESHTASTIC_EXCLUDE_WEBSERVER
         createSSLCert(); // For WebServer
 #endif
-        esp_wifi_set_storage(WIFI_STORAGE_RAM); // Disable flash storage for WiFi credentials
+        WiFi.persistent(false); // Disable flash storage for WiFi credentials
 #endif
         if (!*wifiPsw) // Treat empty password as no password
             wifiPsw = NULL;
